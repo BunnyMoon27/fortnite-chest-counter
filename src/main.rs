@@ -400,7 +400,7 @@ impl App {
             match m {
                 updater::Msg::Note(s) => self.update_note = Some(s),
                 updater::Msg::Ready(v, p) => {
-                    self.update_note = Some(format!("Version {v} is ready. It installs when no match is recording."));
+                    self.update_note = Some(format!("Version {v} is downloaded. It installs by itself when this match ends, or click Install now."));
                     self.update_ready = Some(p);
                 }
             }
@@ -1138,6 +1138,12 @@ impl eframe::App for App {
                         }
                         if let Some(n) = &self.update_note {
                             ui.label(RichText::new(n).size(10.5).color(MUTED));
+                        }
+                        // Normally waits for the match to end, since the restart opens this window over the game.
+                        if self.update_ready.is_some() && ui.button("Install now").clicked() {
+                            if let Some(p) = self.update_ready.take() {
+                                self.update_note = Some(format!("Update failed: {}", updater::apply(&p)));
+                            }
                         }
                     });
                     egui::CollapsingHeader::new(caption("Hotkeys")).default_open(false).show(ui, |ui| {
