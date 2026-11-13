@@ -34,10 +34,9 @@ pub fn spawn(ctx: egui::Context, already_done: Vec<String>, reset_at: Option<i64
     let (cmd_tx, cmd_rx) = std::sync::mpsc::channel::<Cmd>();
     std::thread::spawn(move || {
         let mut done: HashSet<String> = already_done.into_iter().collect();
-        let mut failed: HashSet<String> = HashSet::new();
-        // Unfinished replays: retried only once the file changes again.
+        // Unreadable or unfinished replays: retried only once the file changes again.
+        let mut failed: HashMap<String, SystemTime> = HashMap::new();
         let mut unfinished: HashMap<String, SystemTime> = HashMap::new();
-        let mut retries: HashMap<String, u8> = HashMap::new();
         let mut reset_at = reset_at;
         let mut first_pass = true;
         let mut recording = false;
@@ -63,7 +62,7 @@ pub fn spawn(ctx: egui::Context, already_done: Vec<String>, reset_at: Option<i64
                 .filter(|(_, _, modified)| reset.is_none_or(|r| *modified >= r))
                 .filter(|(path, _, modified)| {
                     let name = file_name(path);
-                    if done.contains(&name) || failed.contains(&name) || unfinished.get(&name) == Some(modified) {
+                    if done.contains(&name) || failed.get(&name) == Some(modified) || unfinished.get(&name) == Some(modified) {
                         return false;
                     }
                     let age = now.duration_since(*modified).unwrap_or_default();
@@ -103,13 +102,11 @@ pub fn spawn(ctx: egui::Context, already_done: Vec<String>, reset_at: Option<i64
                         continue;
                     }
                     Err(e) => {
-                        // Often a read while Fortnite is still writing: retry on a later pass before giving up.
-                        let tries = retries.entry(name.clone()).or_default();
-                        *tries += 1;
-                        if *tries < 3 {
+                        // A recent file is usually still being written (often empty at match start): keep retrying.
+                        if now.duration_since(modified).unwrap_or_default() < STALE_LIVE {
                             continue;
                         }
-                        failed.insert(name.clone());
+                        failed.insert(name.clone(), modified);
                         Msg::Failed(name, e)
                     }
                 };

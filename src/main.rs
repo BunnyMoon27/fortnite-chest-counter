@@ -384,10 +384,14 @@ impl App {
                         self.result_dismissed = false;
                         ctx.send_viewport_cmd(egui::ViewportCommand::RequestUserAttention(egui::UserAttentionType::Informational));
                     }
+                    self.failures.retain(|(f, _)| *f != record.replay_file);
                     self.history.upsert(*record);
                     changed = true;
                 }
-                Msg::Failed(file, e) => self.failures.push((file, e)),
+                Msg::Failed(file, e) => {
+                    self.failures.retain(|(f, _)| *f != file);
+                    self.failures.push((file, e));
+                }
                 Msg::Idle => self.scan = Scan::Watching,
                 Msg::Recording(r) => self.recording = r,
             }

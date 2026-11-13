@@ -1,6 +1,6 @@
 [package]
 name = "chest-counter"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2021"
 license = "GPL-3.0-or-later"
 description = "Counts the chests you open in Fortnite from the game's replay files"
