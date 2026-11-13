@@ -1,0 +1,6 @@
+target/
+*.exe
+
+# local build settings (personal paths)
+.cargo/
+
