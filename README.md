@@ -4,8 +4,6 @@ Counts the chests you open in Fortnite by reading the replay files the game save
 `%LOCALAPPDATA%\FortniteGame\Saved\Demos`. It only reads those files: it never touches the game,
 its memory or its install folder, and it sends nothing over the network.
 
-This is a Rust port of [ChestCounter](https://github.com/xdoofy92/ChestCounter).
-
 Unofficial fan tool. Not affiliated with or endorsed by Epic Games. Fortnite is a trademark of Epic Games, Inc.
 
 ## Build
