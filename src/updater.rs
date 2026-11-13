@@ -135,9 +135,17 @@ pub fn apply(new: &Path) -> String {
 
 /// Deletes the exe left behind by the last update. Call at start.
 pub fn cleanup() {
-    if let Ok(me) = std::env::current_exe() {
-        let _ = std::fs::remove_file(me.with_file_name("ChestCounter.old.exe"));
-    }
+    let Ok(me) = std::env::current_exe() else { return };
+    let old = me.with_file_name("ChestCounter.old.exe");
+    // Right after an update the old process may still be exiting and hold the file, so retry a while.
+    std::thread::spawn(move || {
+        for _ in 0..30 {
+            if !old.exists() || std::fs::remove_file(&old).is_ok() {
+                return;
+            }
+            std::thread::sleep(Duration::from_secs(1));
+        }
+    });
 }
 
 #[cfg(test)]
