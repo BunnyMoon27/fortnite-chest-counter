@@ -1183,7 +1183,9 @@ fn main() -> eframe::Result<()> {
             .with_max_inner_size([270.0, 410.0])
             .with_resizable(false)
             .with_maximize_button(false)
-            .with_title("Chest Counter"),
+            .with_title("Chest Counter")
+            // Title bar and taskbar icon; the exe file icon comes from build.rs.
+            .with_icon(egui::IconData { rgba: include_bytes!("../assets/icon64.rgba").to_vec(), width: 64, height: 64 }),
         ..Default::default()
     };
     if let Some([x, y]) = History::load().window_pos {
