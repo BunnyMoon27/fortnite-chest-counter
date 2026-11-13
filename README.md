@@ -55,7 +55,8 @@ The **Move / Lock** button does the same as the lock hotkey.
 
 ## Your data
 
-- Everything stays on your PC. The app does not send anything over the internet.
+- Your chest data stays on your PC and is never sent anywhere.
+- The only internet use is checking GitHub for new versions, and downloading them. Updates are checked on start and every 6 hours, and they install when no match is being recorded.
 - The app only reads replay files. It never touches the game.
 - Your history is saved in `%LOCALAPPDATA%\ChestCounterRs\history.json`.
 - Matches stay counted even after Fortnite deletes old replay files.
@@ -81,6 +82,19 @@ Files in `target/release/`:
 - `cc-cli.exe <file.replay>`: prints one match as JSON. `cc-cli.exe --scan` analyzes every replay.
 
 Set `CHESTCOUNTER_DEMO_RESULT=1` to show the latest match as just finished, to preview the banner and overlay.
+
+### Publishing a release (auto-update)
+
+The app updates itself from the latest GitHub release. Each release needs two files:
+
+- `ChestCounter.exe`: the release build (`target/release/chest-counter.exe`, renamed).
+- `SHA256SUMS.txt`: one line, `<sha256>  ChestCounter.exe`. The app refuses any download that does not match it.
+
+Give the release a higher version than `Cargo.toml` (for example `v0.1.1`) and bump `version` in `Cargo.toml` to match.
+
+```
+Get-FileHash .\ChestCounter.exe -Algorithm SHA256
+```
 
 ## Credits and licenses
 

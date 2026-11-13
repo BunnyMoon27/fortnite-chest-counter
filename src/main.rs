@@ -1,9 +1,11 @@
 // No console window in release builds.
 #![cfg_attr(not(debug_assertions), windows_subsystem = "windows")]
 
+mod updater;
 mod watcher;
 
 use std::collections::{BTreeMap, HashSet};
+use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::{Receiver, Sender};
 use std::sync::{Arc, Mutex};
@@ -250,6 +252,11 @@ struct App {
     hotkey_err: Option<String>,
     /// Text in the Hotkeys settings fields: (show/hide, lock/move).
     hotkey_edit: (String, String),
+    update_rx: Receiver<updater::Msg>,
+    update_tx: Sender<updater::Msg>,
+    update_note: Option<String>,
+    /// Downloaded and verified update, installed as soon as no match is recording.
+    update_ready: Option<PathBuf>,
 }
 
 impl App {
@@ -257,6 +264,8 @@ impl App {
         apply_theme(&cc.egui_ctx);
         let history = History::load();
         let (rx, cmd) = watcher::spawn(cc.egui_ctx.clone(), history.analyzed_files(), history.reset_at_unix);
+        let (update_tx, update_rx) = std::sync::mpsc::channel();
+        updater::spawn_periodic(update_tx.clone(), cc.egui_ctx.clone());
 
         // Global hotkeys (work while the game has focus); the ids follow whatever keys are bound.
         let overlay_toggle = Arc::new(AtomicBool::new(false));
@@ -307,6 +316,10 @@ impl App {
             hotkey_ids,
             hotkey_err: None,
             hotkey_edit: (saved.0.clone(), saved.1.clone()),
+            update_rx,
+            update_tx,
+            update_note: None,
+            update_ready: None,
         };
         // Saved keys that fail (typo, or taken by another app) fall back to the defaults; the error stays visible.
         if let Err(e) = app.bind_hotkeys(&saved.0, &saved.1) {
@@ -377,6 +390,21 @@ impl App {
                 Msg::Failed(file, e) => self.failures.push((file, e)),
                 Msg::Idle => self.scan = Scan::Watching,
                 Msg::Recording(r) => self.recording = r,
+            }
+        }
+        while let Ok(m) = self.update_rx.try_recv() {
+            match m {
+                updater::Msg::Note(s) => self.update_note = Some(s),
+                updater::Msg::Ready(v, p) => {
+                    self.update_note = Some(format!("Version {v} is ready. It installs when no match is recording."));
+                    self.update_ready = Some(p);
+                }
+            }
+        }
+        // Install as soon as no match is being recorded. apply() only returns if the install failed.
+        if !self.recording {
+            if let Some(p) = self.update_ready.take() {
+                self.update_note = Some(format!("Update failed: {}", updater::apply(&p)));
             }
         }
         if self.overlay_toggle.swap(false, Ordering::SeqCst) {
@@ -1099,6 +1127,15 @@ impl eframe::App for App {
                         ui.add_space(6.0);
                         ui.label(RichText::new(format!("{not_counted} other matches not counted (before v43, other modes, or before your last reset).")).size(10.0).color(MUTED));
                     }
+                    egui::CollapsingHeader::new(caption("Updates")).default_open(false).show(ui, |ui| {
+                        ui.label(RichText::new(format!("Version {}", updater::CURRENT)).size(11.0).color(MUTED));
+                        if ui.button("Check for updates").clicked() {
+                            updater::check_now(self.update_tx.clone(), ui.ctx().clone());
+                        }
+                        if let Some(n) = &self.update_note {
+                            ui.label(RichText::new(n).size(10.5).color(MUTED));
+                        }
+                    });
                     egui::CollapsingHeader::new(caption("Hotkeys")).default_open(false).show(ui, |ui| {
                         ui.horizontal(|ui| {
                             ui.label(RichText::new("Show / hide").size(11.0));
@@ -1138,6 +1175,7 @@ impl eframe::App for App {
 }
 
 fn main() -> eframe::Result<()> {
+    updater::cleanup(); // remove the exe left behind by the last update
     let mut options = eframe::NativeOptions {
         viewport: egui::ViewportBuilder::default()
             .with_inner_size([270.0, 410.0])
